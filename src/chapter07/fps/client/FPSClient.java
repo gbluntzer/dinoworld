@@ -34,45 +34,43 @@ package chapter07.fps.client;
 import com.jme3.app.SimpleApplication;
 import com.jme3.material.Material;
 import com.jme3.math.FastMath;
-import com.jme3.math.Quaternion;
 import java.io.IOException;
 
 import com.jme3.network.Client;
 import com.jme3.network.Message;
 import com.jme3.network.Network;
 import com.jme3.scene.CameraNode;
-import com.jme3.scene.Geometry;
 import com.jme3.scene.Node;
 import com.jme3.scene.Spatial;
 import com.jme3.scene.control.CameraControl;
-import com.jme3.scene.shape.Box;
 import com.jme3.system.AppSettings;
-import java.util.ArrayList;
-import java.util.Collection;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.Properties;
 import java.util.concurrent.Callable;
 import chapter07.fps.client.object.ClientBullet;
 import chapter07.fps.client.object.ClientPlayerControl;
-import chapter07.fps.common.message.PlayerActionMessage;
 import chapter07.fps.common.object.Game;
 import chapter07.fps.common.object.GameUtil;
-import chapter07.fps.common.object.NetworkedPlayerControl;
 import chapter07.fps.network.ClientPhysicsAppState;
+import com.jme3.animation.AnimChannel;
+import com.jme3.animation.AnimControl;
+import com.jme3.animation.AnimEventListener;
 //import chapter08.network.ClientPhysicsAppState;
 import com.jme3.light.AmbientLight;
 
-public class FPSClient extends SimpleApplication{
+public class FPSClient extends SimpleApplication  implements AnimEventListener{
 
     private Client client;
     private ClientPlayerControl thisPlayer;
     private Game game;
-    
+
     private Material playerMaterial;
 //    private Geometry playerGeometry;
     private Node playerModel;
-    
+
+    private AnimControl control;
+    private AnimChannel channel;
+
     /**
      * Firing
      */
@@ -80,21 +78,22 @@ public class FPSClient extends SimpleApplication{
     /**
      * Firing
      */
-    
+
     /**
      * Level loading
      */
     private Node levelNode = new Node("Level");
+
     /**
      * /Level loading
      */
- 
+
     public static void main(String[] args) throws Exception {
         GameUtil.initialize();
-        
+
         FPSClient client = new FPSClient();
         client.setPauseOnLostFocus(false);
-        
+
         AppSettings settings = new AppSettings(false);
         settings.setFrameRate(60);
         client.setSettings(settings);
@@ -104,109 +103,126 @@ public class FPSClient extends SimpleApplication{
     public FPSClient() throws IOException {
         Properties prop = new Properties();
         prop.load(getClass().getClassLoader().getResourceAsStream("chapter07/resources/network.properties"));
-        client = Network.connectToServer(prop.getProperty("server.name"), Integer.parseInt(prop.getProperty("server.version")), prop.getProperty("server.address"), Integer.parseInt(prop.getProperty("server.port")));
+        String serverAddress = System.getProperty("server.address");
+        String serverPortString = System.getProperty("server.port");
+
+        //prop.getProperty("server.address")
+        //Integer.parseInt(prop.getProperty("server.port"))
+        System.out.println("serverAddress " + serverAddress);
+        System.out.println("serverPortString " + serverPortString);
+
+        client = Network.connectToServer(prop.getProperty("server.name"), Integer.parseInt(prop.getProperty("server.version")), serverAddress, Integer.parseInt(serverPortString));
     }
-    
-    public ClientPlayerControl getThisPlayer(){
+
+    public ClientPlayerControl getThisPlayer() {
         return thisPlayer;
     }
-    
-    public void setThisPlayer(final ClientPlayerControl player){
+
+    public void setThisPlayer(final ClientPlayerControl player) {
         this.thisPlayer = player;
         final CameraNode camNode = new CameraNode("CamNode", cam);
         camNode.setControlDir(CameraControl.ControlDirection.SpatialToCamera);
-        enqueue(new Callable(){
+        enqueue(new Callable() {
 
             public Object call() throws Exception {
-                ((Node)player.getSpatial()).detachChildAt(0);
+                ((Node) player.getSpatial()).detachChildAt(0);
                 player.getHeadNode().attachChild(camNode);
                 return null;
             }
         });
-        
+
     }
 
-    public ClientPlayerControl createPlayer(int id){
+    public ClientPlayerControl createPlayer(int id) {
         ClientPlayerControl player = new ClientPlayerControl();
         player.setId(id);
         final Node playerNode = new Node("Player Node");
 //        playerNode.attachChild(assetManager.loadModel("Models/Jaime/Jaime.j3o"));//
-        playerNode.attachChild(assetManager.loadModel("Models/dilo_animated.j3o"));//
+        Spatial dino = assetManager.loadModel("Models/dilo_animated.j3o");
+        playerNode.attachChild(dino);//
         playerNode.addControl(player);
-        enqueue(new Callable(){
+        
+        control = getAnimControl(dino);
+        System.out.println(control);
+        control.addListener(this);
+        channel = control.createChannel();
+        channel.setAnim("Run.001");
+
+        enqueue(new Callable() {
 
             public Object call() throws Exception {
+                
                 rootNode.attachChild(playerNode);
                 return null;
             }
         });
-        
+
         return player;
     }
-    
-    public void removePlayer(ClientPlayerControl player){
+
+    public void removePlayer(ClientPlayerControl player) {
         rootNode.detachChild(player.getSpatial());
     }
-    
+
     @Override
     public void simpleInitApp() {
         InputAppState inputAppState = new InputAppState();
         inputAppState.setClient(this);
         stateManager.attach(inputAppState);
-        
-        playerMaterial  = new Material(assetManager, "Common/MatDefs/Misc/Unshaded.j3md");
+
+        playerMaterial = new Material(assetManager, "Common/MatDefs/Misc/Unshaded.j3md");
 //        playerGeometry = new Geometry("Player", new Box(1f,1f,1f));
 //        playerGeometry.setMaterial(playerMaterial);
-        
+
         getFlyByCamera().setEnabled(false);
-        
+
         game = new Game();
         ClientMessageHandler messageHandler = new ClientMessageHandler(this, game);
         client.addMessageListener(messageHandler);
         client.start();
-        
+
         rootNode.addLight(new AmbientLight());
         inputManager.setCursorVisible(false);
     }
-    
-    public void send(Message message){
+
+    public void send(Message message) {
         client.send(message);
     }
-    
+
     /**
      * Level loading
      */
-    
-    public void loadLevel(final String levelName){
-        enqueue(new Callable(){
+    public void loadLevel(final String levelName) {
+        enqueue(new Callable() {
 
             public Object call() throws Exception {
-                if(rootNode.hasChild(levelNode)){
+                if (rootNode.hasChild(levelNode)) {
                     rootNode.detachChild(levelNode);
                 }
-                levelNode = (Node) assetManager.loadModel("Scenes/"+levelName + ".j3o");
+                levelNode = (Node) assetManager.loadModel("Scenes/" + levelName + ".j3o");
                 rootNode.attachChild(levelNode);
-                
-                /**
-                * Physics
-                */
-               ClientPhysicsAppState clientPhysics = new ClientPhysicsAppState();
-               clientPhysics.setGame(game);
-               clientPhysics.setClient(FPSClient.this);
-               stateManager.attach(clientPhysics);
 
-               /**
-                * Physics
-                */
+                /**
+                 * Physics
+                 */
+                ClientPhysicsAppState clientPhysics = new ClientPhysicsAppState();
+                clientPhysics.setGame(game);
+                clientPhysics.setClient(FPSClient.this);
+                stateManager.attach(clientPhysics);
+
+                /**
+                 * Physics
+                 */
                 return null;
             }
         });
-        
+
     }
-    
-    public Node getLevelNode(){
+
+    public Node getLevelNode() {
         return levelNode;
     }
+
     /**
      * /Level loading
      */
@@ -217,15 +233,14 @@ public class FPSClient extends SimpleApplication{
         client.close();
     }
 
-    
     /**
      * Firing
      */
-    public ClientBullet createBullet(int id){
+    public ClientBullet createBullet(int id) {
         final ClientBullet bulletControl = new ClientBullet();
         final Spatial g = assetManager.loadModel("Models/base_dino.j3o");
         g.rotate(FastMath.nextRandomFloat(), FastMath.nextRandomFloat(), FastMath.nextRandomFloat());
-        
+
         g.addControl(bulletControl);
         bullets.put(id, bulletControl);
         enqueue(new Callable<Object>() {
@@ -237,12 +252,12 @@ public class FPSClient extends SimpleApplication{
         });
         return bulletControl;
     }
-    
-    public ClientBullet getBullet(int id){
+
+    public ClientBullet getBullet(int id) {
         return bullets.get(id);
     }
-    
-    public void removeBullet(int id, final Spatial g){
+
+    public void removeBullet(int id, final Spatial g) {
         bullets.remove(id);
         enqueue(new Callable<Object>() {
 
@@ -252,7 +267,35 @@ public class FPSClient extends SimpleApplication{
             }
         });
     }
+
+    @Override
+    public void onAnimCycleDone(AnimControl control, AnimChannel channel, String animName) {
+        //
+    }
+
+    @Override
+    public void onAnimChange(AnimControl control, AnimChannel channel, String animName) {
+        //
+    }
     /**
      * /Firing
      */
+    
+      private AnimControl getAnimControl(Spatial spatial){
+       AnimControl control = spatial.getControl(AnimControl.class);
+       if(control!=null){
+           return control;
+       }else {
+           if(spatial instanceof Node){
+               Node node = (Node) spatial;
+               for(Spatial child : node.getChildren()){
+                   AnimControl childControl = getAnimControl(child);
+                   if(childControl!=null){
+                       return childControl;
+                   }
+               }
+           }
+       }
+       return null;
+    }
 }

@@ -79,9 +79,17 @@ public class FPSServer extends SimpleApplication
         prop.load(getClass().getClassLoader().getResourceAsStream("chapter07/resources/network.properties"));
 
         game = new Game();
-        
-        server = Network.createServer( prop.getProperty("server.name"), Integer.parseInt(prop.getProperty("server.version")), Integer.parseInt(prop.getProperty("server.port")), 
-                Integer.parseInt(prop.getProperty("server.port")));
+        String serverAddress = System.getProperty("server.address");
+        String serverPortString = System.getProperty("server.port");
+         System.out.println("server Address " + serverAddress );
+        System.out.println("server Port String" + serverPortString );
+        int serverPort = Integer.valueOf("5110");
+
+       
+        System.out.println("server Port " + serverPort );
+        //prop.getProperty("server.address")
+        //Integer.parseInt(prop.getProperty("server.port"))
+        server = Network.createServer( prop.getProperty("server.name"), Integer.parseInt(prop.getProperty("server.version")),serverPort ,serverPort);
         
 
         ConnectionListener conListener = new ConnectionListener() {
