@@ -238,7 +238,7 @@ public class FPSClient extends SimpleApplication  implements AnimEventListener{
      */
     public ClientBullet createBullet(int id) {
         final ClientBullet bulletControl = new ClientBullet();
-        final Spatial g = assetManager.loadModel("Models/base_dino.j3o");
+        final Spatial g = assetManager.loadModel("Models/dilo_splat.j3o");
         g.rotate(FastMath.nextRandomFloat(), FastMath.nextRandomFloat(), FastMath.nextRandomFloat());
 
         g.addControl(bulletControl);

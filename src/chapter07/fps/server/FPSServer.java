@@ -92,7 +92,7 @@ public class FPSServer extends SimpleApplication
         server = Network.createServer( prop.getProperty("server.name"), Integer.parseInt(prop.getProperty("server.version")),serverPort ,serverPort);
         
 
-        ConnectionListener conListener = new ConnectionListener() {
+        ConnectionListener conListener = new ConnectionListener() { 
 
             public void connectionAdded(Server server, HostedConnection conn) {
                 
